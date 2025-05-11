@@ -139,6 +139,8 @@
     composer.addPass(new RenderPass(scene, camera));
     composer.addPass(new SSAOPass(scene, camera, window.innerWidth, window.innerHeight));
     composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85));
+    // ensure composer matches renderer size initially
+    composer.setSize(window.innerWidth, window.innerHeight);
 
     // Resize
     window.addEventListener('resize', () => {
@@ -150,11 +152,8 @@
     // Animate
     const clock = new THREE.Clock();
     function animate(){
-      const dt = clock.getDelta();
-      mixers.forEach(m => m.update(dt));
-      controls.update();
-      composer.render();
-      requestAnimationFrame(animate);
+      const dt = clock.getDelta(); mixers.forEach(m=>m.update(dt));
+      controls.update(); composer.render(); requestAnimationFrame(animate);
     }
     animate();
   </script>
