@@ -2,13 +2,19 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>3D Village Demo (Module Minimal Test)</title>
+  <title>Detailed 3D Village Experience</title>
   <style>
     html, body { margin: 0; padding: 0; overflow: hidden; }
     canvas { display: block; width: 100vw; height: 100vh; }
-    #info { position: absolute; top: 10px; left: 10px; color: #fff; background: rgba(0,0,0,0.5); padding: 8px; font-family: sans-serif; z-index: 10; }
+    #info {
+      position: absolute; top: 10px; left: 10px;
+      color: #fff; font-family: sans-serif;
+      background: rgba(0,0,0,0.6);
+      padding: 8px 12px; border-radius: 4px;
+      z-index: 100;
+    }
   </style>
-  <!-- importmap for bare module specifiers -->
+  <!-- importmap for bare specifiers -->
   <script type="importmap">
   {
     "imports": {
@@ -18,45 +24,135 @@
   </script>
 </head>
 <body>
-  <div id="info">Module Test: 緑地面 &amp; 赤箱</div>
+  <div id="info">TAB: 中⇔外　←→↑↓ or WASD: 移動</div>
   <canvas id="scene"></canvas>
 
   <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+    import * as THREE from 'three';
     import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
 
-    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene'), antialias: true });
+    const canvas = document.getElementById('scene');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.shadowMap.enabled = true;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
 
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
-    camera.position.set(0, 5, 10);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(0, 2, 5);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0, 0);
-    controls.update();
+    controls.enableDamping = true;
+    controls.target.set(0,1,0);
 
-    // Light
+    // Lights
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
+    const sun = new THREE.DirectionalLight(0xfff8e5, 1);
+    sun.position.set(5, 10, 2);
+    sun.castShadow = true;
+    scene.add(sun);
 
-    // Ground
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), groundMat);
+    // Interior hut group
+    const hut = new THREE.Group();
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xdeb887 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    // Floor
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(6,6), floorMat);
+    floor.rotation.x = -Math.PI/2;
+    hut.add(floor);
+    // Walls
+    const wallGeo = new THREE.PlaneGeometry(6,3);
+    const positions = [
+      { x: 0, z: -3, rotY: 0 },
+      { x: 0, z: 3, rotY: Math.PI },
+      { x: -3, z: 0, rotY: Math.PI/2 },
+      { x: 3, z: 0, rotY: -Math.PI/2 }
+    ];
+    positions.forEach(p => {
+      const w = new THREE.Mesh(wallGeo, wallMat);
+      w.position.set(p.x, 1.5, p.z);
+      w.rotation.y = p.rotY;
+      hut.add(w);
+    });
+    scene.add(hut);
+
+    // Exterior ground
+    const texLoader = new THREE.TextureLoader();
+    const grass = texLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+    grass.wrapS = grass.wrapT = THREE.RepeatWrapping;
+    grass.repeat.set(50,50);
+    const groundMat = new THREE.MeshStandardMaterial({ map: grass });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200,200), groundMat);
     ground.rotation.x = -Math.PI/2;
+    ground.receiveShadow = true;
     scene.add(ground);
 
-    // Box
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const box = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), boxMat);
-    scene.add(box);
+    // Load houses from glTF
+    const loader = new GLTFLoader();
+    const houseURL = 'https://rawcdn.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/House/glTF/House.gltf';
+    for(let i=0; i<8; i++){
+      loader.load(houseURL, gltf => {
+        const m = gltf.scene.clone();
+        m.traverse(o=> o.isMesh && (o.castShadow = o.receiveShadow = true));
+        m.scale.set(1.2,1.2,1.2);
+        m.position.set((Math.random()-0.5)*50, 0, (Math.random()-0.5)*50);
+        scene.add(m);
+      });
+    }
 
-    const animate = () => {
+    // Trees
+    for(let i=0;i<30;i++){
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,3), new THREE.MeshStandardMaterial({ color: 0x8b4513 }));
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(2,5,8), new THREE.MeshStandardMaterial({ color: 0x228b22 }));
+      const x = (Math.random()-0.5)*100, z = (Math.random()-0.5)*100;
+      trunk.position.set(x,1.5,z);
+      leaves.position.set(x,4,z);
+      trunk.castShadow = leaves.castShadow = true;
+      scene.add(trunk, leaves);
+    }
+
+    // NPCs: simple spheres with random walk
+    const npcs = [];
+    const npcMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+    for(let i=0;i<10;i++){
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16), npcMat);
+      s.position.set((Math.random()-0.5)*60,0.5,(Math.random()-0.5)*60);
+      scene.add(s);
+      npcs.push({ mesh: s, dir: new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize() });
+    }
+
+    // Mode toggle interior/exterior
+    let outside = false;
+    window.addEventListener('keydown', e => {
+      if(e.code==='Tab'){
+        outside = !outside;
+        if(outside){
+          camera.position.set(0,10,30);
+          controls.target.set(0,0,0);
+        } else {
+          camera.position.set(0,2,5);
+          controls.target.set(0,1,0);
+        }
+      }
+    });
+
+    // Animation loop
+    function animate(){
       controls.update();
+      // NPC movement
+      npcs.forEach(n => {
+        n.mesh.position.addScaledVector(n.dir, 0.02);
+        if(n.mesh.position.x>100||n.mesh.position.x<-100||n.mesh.position.z>100||n.mesh.position.z<-100){
+          n.dir.set(Math.random()-0.5,0,Math.random()-0.5).normalize();
+        }
+      });
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
-    };
+    }
     animate();
   </script>
 </body>
