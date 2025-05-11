@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>3D Village Demo (Minimal Test)</title>
+  <meta charset="UTF-8">
+  <title>3D Village Demo (Module Minimal Test)</title>
   <style>
     html, body { margin: 0; padding: 0; overflow: hidden; }
     canvas { display: block; width: 100vw; height: 100vh; }
@@ -10,14 +10,12 @@
   </style>
 </head>
 <body>
-  <div id="info">最小テスト：地面（緑）、箱（赤）</div>
+  <div id="info">Module Test: 緑地面 &amp; 赤箱</div>
   <canvas id="scene"></canvas>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js';
 
-  <!-- Three.js core and controls -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
-
-  <script>
     const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene'), antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -27,40 +25,29 @@
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
     camera.position.set(0, 5, 10);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0);
-    controls.update();
 
     // Light
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
 
-    // Ground: green plane
+    // Ground
     const groundMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), groundMat);
     ground.rotation.x = -Math.PI/2;
     scene.add(ground);
 
-    // Box: red cube
-    const box = new THREE.Mesh(
-      new THREE.BoxGeometry(1,1,1),
-      new THREE.MeshStandardMaterial({ color: 0xff0000 })
-    );
+    // Box
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), boxMat);
     scene.add(box);
 
-    // Resize
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      render();
-    });
-
-    function render() {
+    const animate = () => {
       controls.update();
       renderer.render(scene, camera);
-    }
-
-    render();
+      requestAnimationFrame(animate);
+    };
+    animate();
   </script>
 </body>
 </html>
