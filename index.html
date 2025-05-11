@@ -36,7 +36,7 @@
     import { UnrealBloomPass } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/postprocessing/UnrealBloomPass.js';
     import { SSAOPass } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/postprocessing/SSAOPass.js';
 
-    // Renderer
+    // Renderer setup
     const canvas = document.getElementById('scene');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -45,7 +45,7 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Scene
+    // Scene and HDR environment
     const scene = new THREE.Scene();
     new RGBELoader().setDataType(THREE.UnsignedByteType)
       .load('https://rawcdn.githack.com/mrdoob/three.js/dev/examples/textures/equirectangular/venice_sunset_1k.hdr', env => {
@@ -54,7 +54,7 @@
         scene.background = env;
       });
 
-    // Camera: 出発点を村全体が見渡せる位置に変更
+    // Camera setup
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 500);
     camera.position.set(0, 25, 50);
 
@@ -86,7 +86,6 @@
 
     // Load models
     const loader = new GLTFLoader();
-    // 中央の高ディテール村モデル
     loader.load('https://rawcdn.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/AnimatedMorphSphere/glTF/AnimatedMorphSphere.gltf', gltf => {
       const village = gltf.scene;
       village.traverse(o=>o.isMesh && (o.castShadow = o.receiveShadow = true));
@@ -94,7 +93,6 @@
       village.position.set(0, 0, -10);
       scene.add(village);
     });
-    // 小屋内部
     loader.load('https://rawcdn.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxHouse/glTF/BoxHouse.gltf', gltf => {
       const h = gltf.scene;
       h.traverse(o=>o.isMesh && (o.castShadow = o.receiveShadow = true));
@@ -103,7 +101,7 @@
       scene.add(h);
     });
 
-    // Trees
+    // Instanced trees
     const trunkGeo = new THREE.CylinderGeometry(0.3,0.3,4,12);
     const leafGeo = new THREE.ConeGeometry(1.5,4,8);
     const instTrunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({color:0x8b5a2b}), 50);
@@ -116,38 +114,44 @@
     instTrunks.castShadow = true; scene.add(instTrunks);
     instLeaves.castShadow = true; scene.add(instLeaves);
 
-    // NPCs
+    // NPC animations
     const mixers = [];
     loader.load('https://rawcdn.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF/CesiumMan.gltf', gltf => {
       for(let i=0;i<5;i++){
         const npc = gltf.scene.clone();
         npc.position.set((Math.random()-0.5)*50,0,(Math.random()-0.5)*50);
-        camera.lookAt(npc.position);
         scene.add(npc);
         const mixer = new THREE.AnimationMixer(npc);
-        mixer.clipAction(gltf.animations[0]).play(); mixers.push(mixer);
+        mixer.clipAction(gltf.animations[0]).play();
+        mixers.push(mixer);
       }
     });
 
-    // Post-processing
+    // Post-processing pipeline
     const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new SSAOPass(scene, camera, window.innerWidth, window.innerHeight));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85));
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+    composer.addPass(ssaoPass);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85);
+    bloomPass.renderToScreen = true;
+    composer.addPass(bloomPass);
     composer.setSize(window.innerWidth, window.innerHeight);
 
-    // Resize
+    // Handle resize
     window.addEventListener('resize', () => {
       const w=window.innerWidth, h=window.innerHeight;
       camera.aspect = w/h; camera.updateProjectionMatrix();
-      renderer.setSize(w,h); composer.setSize(w,h);
+      renderer.setSize(w,h);
+      composer.setSize(w,h);
     });
 
-    // Animate
+    // Animation loop
     const clock = new THREE.Clock();
     function animate(){
       const dt = clock.getDelta(); mixers.forEach(m=>m.update(dt));
-      controls.update(); composer.render(); requestAnimationFrame(animate);
+      controls.update(); composer.render();
+      requestAnimationFrame(animate);
     }
     animate();
   </script>
