@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Realistic 3D Village</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; }
+    canvas { display: block; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      z-index: 100;
+      background: rgba(0,0,0,0.3);
+      padding: 5px 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<div id="info">ドラッグで視点移動・ホイールでズーム</div>
+<canvas id="scene"></canvas>
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js';
+  import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
+  import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/RGBELoader.js';
+
+  // Renderer
+  const canvas = document.getElementById('scene');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+
+  // Scene and Camera
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(10, 8, 15);
+
+  // Controls
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1, 0);
+  controls.enableDamping = true;
+
+  // Lights
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+  hemi.position.set(0, 20, 0);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 1);
+  dir.position.set(-5, 10, -5);
+  dir.castShadow = true;
+  dir.shadow.camera.top = 10;
+  dir.shadow.camera.bottom = -10;
+  dir.shadow.camera.left = -10;
+  dir.shadow.camera.right = 10;
+  scene.add(dir);
+
+  // HDR Environment
+  new RGBELoader()
+    .setDataType(THREE.UnsignedByteType)
+    .load(
+      'https://rawcdn.githack.com/mrdoob/three.js/dev/examples/textures/equirectangular/royal_esplanade_1k.hdr',
+      (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = texture;
+        scene.background = texture;
+      }
+    );
+
+  // Ground
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Village Road
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(200, 4), roadMat);
+  road.rotation.x = -Math.PI / 2;
+  road.position.y = 0.01;
+  scene.add(road);
+
+  // Load Houses
+  const loader = new GLTFLoader();
+  const houseModels = [
+    'https://rawcdn.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxHouse/glTF/BoxHouse.gltf',
+    'https://rawcdn.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/House/glTF/House.gltf'
+  ];
+  houseModels.forEach((url, i) => {
+    loader.load(url, (gltf) => {
+      const model = gltf.scene;
+      model.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+      model.scale.set(0.6, 0.6, 0.6);
+      model.position.set((i % 2 ? 1 : -1) * 8, 0, (i < 1 ? 1 : -1) * 8);
+      scene.add(model);
+    });
+  });
+
+  // Simple Trees
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+  for (let i = 0; i < 12; i++) {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 4), trunkMat);
+    const leaves = new THREE.Mesh(new THREE.ConeGeometry(2, 6, 8), leafMat);
+    trunk.position.set((Math.random() - 0.5) * 80, 2, (Math.random() - 0.5) * 80);
+    leaves.position.set(trunk.position.x, trunk.position.y + 4, trunk.position.z);
+    trunk.castShadow = true;
+    leaves.castShadow = true;
+    scene.add(trunk, leaves);
+  }
+
+  // Animated Loop
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+</script>
+</body>
+</html>
